@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回忆册 · 私人相册</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#111827;color:#fff;padding:20px;font-family:Arial, sans-serif}
+        .header{position:sticky;top:0;background:#111827;padding:20px 0;z-index:100}
+        .header h1{font-size:20px}
+        .btn{padding:10px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer}
+        .btn-outline{background:transparent;border:1px solid #374151}
+        .btn-danger{background:#b91c1c;color:#fff}
+        .upload-box{padding:16px;border-bottom:1px solid #374151;margin-bottom:20px}
+        #photoInput{display:none}
+        .upload-btn{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer}
+        .gallery{padding:12px;display:grid;gap:12px;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr))}
+        .photo-item{position:relative;width:100%;border-radius:8px;overflow:hidden;aspect-ratio:1/1}
+        .photo-item img{width:100%;height:100%;display:block;object-fit:cover}
+        .del-btn{position:absolute;top:8px;right:8px;width:32px;height:32px;background:#b91c1c;color:#fff;border:none;border-radius:50%;cursor:pointer;display:none}
+        .photo-item:hover .del-btn{display:block}
+        .mask{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:200}
+        .mask img{max-width:90%;max-height:90%;border-radius:8px}
+        .pwd-box{background:#1F2937;padding:24px;border-radius:12px;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:300;min-width:300px}
+        .pwd-box h3{margin-bottom:16px}
+        #pwdInput{width:100%;padding:12px;background:#111827;border:1px solid #374151;border-radius:8px;color:#fff;margin-bottom:16px}
+        .pwd-btns{display:flex;gap:12px}
+        .pwd-btns button{flex:1;padding:12px;border:none;border-radius:8px;cursor:pointer}
+    </style>
+</head>
+<body>
+    <div class="pwd-box" id="pwdBox">
+        <h3>请输入密码访问相册</h3>
+        <input type="password" id="pwdInput" placeholder="请输入密码">
+        <div class="pwd-btns">
+            <button class="btn" id="confirmPwd">确认</button>
+            <button class="btn btn-outline" id="cancelPwd">取消</button>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1>家庭回忆册</h1>
+    </div>
+
+    <div class="upload-box">
+        <input type="file" id="photoInput" accept="image/*" multiple>
+        <button class="upload-btn" id="uploadBtn">选择照片上传</button>
+    </div>
+
+    <div class="gallery" id="gallery"></div>
+
+    <div class="mask" id="mask">
+        <img src="" alt="大图预览" id="previewImg">
+    </div>
+
+    <script>
+        const CORRECT_PASSWORD = "88889999";
+        const gallery = document.getElementById('gallery');
+        const photoInput = document.getElementById('photoInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const mask = document.getElementById('mask');
+        const previewImg = document.getElementById('previewImg');
+        const pwdBox = document.getElementById('pwdBox');
+        const pwdInput = document.getElementById('pwdInput');
+        const confirmPwd = document.getElementById('confirmPwd');
+        const cancelPwd = document.getElementById('cancelPwd');
+
+        let photos = JSON.parse(localStorage.getItem('familyPhotos')) || [];
+        let isAuthenticated = false;
+
+        // 密码验证
+        confirmPwd.addEventListener('click', () => {
+            const input = pwdInput.value.trim();
+            if (input === CORRECT_PASSWORD) {
+                isAuthenticated = true;
+                pwdBox.style.display = 'none';
+                renderGallery();
+            } else {
+                alert('密码错误，请重新输入');
+                pwdInput.value = '';
+            }
+        });
+
+        cancelPwd.addEventListener('click', () => {
+            pwdInput.value = '';
+        });
+
+        // 渲染相册
+        function renderGallery() {
+            gallery.innerHTML = '';
+            photos.forEach((photo, index) => {
+                const item = document.createElement('div');
+                item.className = 'photo-item';
+                item.innerHTML = `
+                    <img src="${photo.url}" alt="照片">
+                    <button class="del-btn" data-index="${index}">×</button>
+                `;
+                // 点击预览
+                item.querySelector('img').addEventListener('click', () => {
+                    previewImg.src = photo.url;
+                    mask.style.display = 'flex';
+                });
+                // 仅认证用户可删除
+                const delBtn = item.querySelector('.del-btn');
+                delBtn.style.display = isAuthenticated ? 'block' : 'none';
+                delBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (isAuthenticated) {
+                        photos.splice(index, 1);
+                        savePhotos();
+                        renderGallery();
+                    }
+                });
+                gallery.appendChild(item);
+            });
+        }
+
+        // 上传照片
+        uploadBtn.addEventListener('click', () => {
+            if (!isAuthenticated) {
+                alert('请先输入密码验证身份');
+                pwdBox.style.display = 'block';
+                return;
+            }
+            photoInput.click();
+        });
+
+        photoInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const photoUrl = event.target.result;
+                    photos.unshift({ url: photoUrl });
+                    savePhotos();
+                    renderGallery();
+                };
+                reader.readAsDataURL(file);
+            });
+            photoInput.value = '';
+        });
+
+        // 点击遮罩关闭预览
+        mask.addEventListener('click', () => {
+            mask.style.display = 'none';
+        });
+
+        // 保存照片到本地
+        function savePhotos() {
+            localStorage.setItem('familyPhotos', JSON.stringify(photos));
+        }
+
+        // 页面加载时，先显示密码框
+        window.addEventListener('load', () => {
+            pwdBox.style.display = 'block';
+        });
+    </script>
+</body>
+</html>
