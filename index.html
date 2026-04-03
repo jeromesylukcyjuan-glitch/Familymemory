@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭相册</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+  body{background:#f7f8fa}
+  .login{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f7f8fa}
+  .login-box{background:#fff;padding:40px 30px;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,0.08);width:90%;max-width:400px;text-align:center}
+  .login-box h1{font-size:24px;margin-bottom:8px}
+  .login-box p{color:#666;margin-bottom:24px}
+  #password{width:100%;padding:14px 16px;border:1px solid #ddd;border-radius:12px;font-size:16px;margin-bottom:16px}
+  #loginBtn{width:100%;padding:14px;background:#4c6ef5;color:#fff;border:none;border-radius:12px;font-size:16px;cursor:pointer}
+  #err{color:red;font-size:14px;margin-top:8px;display:none}
+  .action-bar{padding:20px;text-align:center;display:none}
+  #uploadBtn,#logoutBtn{padding:12px 24px;border:none;border-radius:12px;font-size:16px;cursor:pointer}
+  #uploadBtn{background:#4c6ef5;color:#fff;margin-right:10px}
+  #logoutBtn{background:#ccc}
+  #fileInput{display:none}
+  .gallery{padding:0 20px 40px;max-width:1000px;margin:0 auto;display:none}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr)}}
+  .photo-item{position:relative;border-radius:12px;overflow:hidden;background:#eee;padding-top:100%;cursor:pointer}
+  .photo-item img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
+  .del-btn{position:absolute;top:8px;right:8px;width:28px;height:28px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;cursor:pointer;display:none}
+  .admin .del-btn{display:block}
+  .viewer{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:999;display:none;align-items:center;justify-content:center}
+  .viewer img{max-width:90%;max-height:80%}
+  .viewer button{position:absolute;width:44px;height:44px;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:50%;font-size:24px;cursor:pointer}
+  .close{top:20px;right:20px}
+  .prev{left:20px;top:50%;transform:translateY(-50%)}
+  .next{right:20px;top:50%;transform:translateY(-50%)}
+  .download{bottom:30px;padding:10px 20px;background:#4c6ef5;color:#fff;border:none;border-radius:12px}
+  .empty{text-align:center;padding:60px 20px;color:#999}
+</style>
+</head>
+<body>
+
+<div class="login" id="loginPage">
+  <div class="login-box">
+    <h1>家庭相册</h1>
+    <p>输入密码查看照片</p>
+    <input type="password" id="password" placeholder="请输入密码">
+    <button id="loginBtn">登录</button>
+    <div id="err">密码错误</div>
+  </div>
+</div>
+
+<div class="action-bar" id="actionBar">
+  <button id="uploadBtn">上传照片</button>
+  <button id="logoutBtn">退出登录</button>
+  <input type="file" id="fileInput" multiple accept="image/*">
+</div>
+
+<div class="gallery" id="gallery">
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty">暂无照片</div>
+</div>
+
+<div class="viewer" id="viewer">
+  <button class="close" id="close">×</button>
+  <button class="prev" id="prev">‹</button>
+  <button class="next" id="next">›</button>
+  <img id="viewImg">
+  <button class="download" id="download">下载照片</button>
+</div>
+
+<script>
+const FAMILY = "88889999";
+const ADMIN = "jeromesy3823433";
+const KEY = "family_photos";
+
+let photos = JSON.parse(localStorage.getItem(KEY)||"[]");
+let curr = 0;
+let isAdmin = false;
+
+const loginPage = document.getElementById("loginPage");
+const pwd = document.getElementById("password");
+const err = document.getElementById("err");
+const actionBar = document.getElementById("actionBar");
+const gallery = document.getElementById("gallery");
+const grid = document.getElementById("grid");
+const empty = document.getElementById("empty");
+const viewer = document.getElementById("viewer");
+const viewImg = document.getElementById("viewImg");
+
+document.getElementById("loginBtn").onclick = login;
+pwd.onkeydown = function(e){
+  if(e.key === "Enter") login();
+}
+
+function login(){
+  let v = pwd.value.trim();
+  err.style.display = "none";
+  if(v === FAMILY){
+    isAdmin = false;
+    go();
+  }else if(v === ADMIN){
+    isAdmin = true;
+    go();
+  }else{
+    err.style.display = "block";
+  }
+}
+
+function go(){
+  loginPage.style.display = "none";
+  actionBar.style.display = "block";
+  gallery.style.display = "block";
+  render();
+}
+
+document.getElementById("logoutBtn").onclick=function(){
+  location.reload();
+}
+
+function render(){
+  if(photos.length === 0){
+    grid.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  grid.innerHTML = photos.map((s,i)=>`
+    <div class="photo-item ${isAdmin?"admin":""}" data-i="${i}">
+      <img src="${s.base64}">
+      <button class="del-btn" data-i="${i}">×</button>
+    </div>
+  `).join("");
+
+  grid.querySelectorAll(".photo-item").forEach(el=>{
+    el.onclick = function(e){
+      if(e.target.classList.contains("del-btn")) return;
+      curr = parseInt(this.dataset.i);
+      show();
+    }
+  });
+
+  if(isAdmin){
+    grid.querySelectorAll(".del-btn").forEach(btn=>{
+      btn.onclick = function(e){
+        e.stopPropagation();
+        if(!confirm("确定删除？")) return;
+        photos.splice(parseInt(this.dataset.i),1);
+        localStorage.setItem(KEY,JSON.stringify(photos));
+        render();
+      }
+    })
+  }
+}
+
+function show(){
+  viewImg.src = photos[curr].base64;
+  viewer.style.display = "flex";
+}
+
+document.getElementById("close").onclick=function(){
+  viewer.style.display = "none";
+}
+document.getElementById("prev").onclick=function(){
+  curr = (curr - 1 + photos.length) % photos.length;
+  show();
+}
+document.getElementById("next").onclick=function(){
+  curr = (curr + 1) % photos.length;
+  show();
+}
+
+document.getElementById("download").onclick=function(){
+  let a = document.createElement("a");
+  a.href = photos[curr].base64;
+  a.download = "family_photo.jpg";
+  a.click();
+}
+
+document.getElementById("uploadBtn").onclick=function(){
+  document.getElementById("fileInput").click();
+}
+document.getElementById("fileInput").onchange=async function(e){
+  let fs = Array.from(e.target.files);
+  for(let f of fs){
+    let b64 = await new Promise(function(resolve){
+      let reader = new FileReader();
+      reader.onload = function(){
+        resolve(reader.result);
+      }
+      reader.readAsDataURL(f);
+    });
+    photos.unshift({base64:b64});
+  }
+  localStorage.setItem(KEY,JSON.stringify(photos));
+  render();
+  this.value = "";
+}
+
+render();
+</script>
+</body>
+</html>
