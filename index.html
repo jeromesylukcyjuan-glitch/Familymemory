@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>家庭相册</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:#f7f8fa;font-family:sans-serif;}
+  .login{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+  .box{background:#fff;padding:30px;border-radius:20px;width:90%;max-width:380px;text-align:center;}
+  #pwd{width:100%;padding:14px;border:1px solid #ddd;border-radius:12px;margin:12px 0;font-size:16px;}
+  button{padding:14px 20px;background:#4C6EF5;color:#fff;border:none;border-radius:12px;font-size:16px;cursor:pointer;}
+  #err{color:red;margin-top:10px;display:none;}
+
+  .toolbar{padding:20px;text-align:center;}
+  .toolbar button{margin:0 6px;}
+
+  #file-input{position:absolute;width:0;height:0;opacity:0;}
+
+  .gallery{padding:20px;}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .item{position:relative;padding-top:100%;background:#eee;border-radius:12px;overflow:hidden;}
+  .item img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
+</style>
+</head>
+<body>
+
+<div class="login" id="login-page">
+  <div class="box">
+    <h2>家庭相册</h2>
+    <input type="password" id="pwd" placeholder="请输入密码">
+    <button id="login-btn">登录</button>
+    <div id="err">密码错误</div>
+  </div>
+</div>
+
+<div id="main" style="display:none;">
+  <div class="toolbar">
+    <button id="upload-btn">上传照片</button>
+    <button id="logout-btn">退出登录</button>
+    <input type="file" id="file-input" accept="image/*" multiple>
+  </div>
+
+  <div class="gallery">
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<script>
+const PASSWORD = "88889999";
+const STORAGE_KEY = "photos";
+let photos = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+
+const loginPage = document.getElementById("login-page");
+const mainPage = document.getElementById("main");
+const pwdInput = document.getElementById("pwd");
+const loginBtn = document.getElementById("login-btn");
+const uploadBtn = document.getElementById("upload-btn");
+const logoutBtn = document.getElementById("logout-btn");
+const fileInput = document.getElementById("file-input");
+const grid = document.getElementById("grid");
+const err = document.getElementById("err");
+
+loginBtn.addEventListener("click", login);
+pwdInput.addEventListener("keydown", e=>{
+  if(e.key==="Enter")login();
+});
+
+function login(){
+  if(pwdInput.value === PASSWORD){
+    loginPage.style.display = "none";
+    mainPage.style.display = "block";
+    render();
+  }else{
+    err.style.display = "block";
+  }
+}
+
+logoutBtn.addEventListener("click", ()=>{
+  location.reload();
+});
+
+// 手机关键修复：用 touch 兼容触发
+uploadBtn.addEventListener("click", ()=>{
+  fileInput.click();
+});
+uploadBtn.addEventListener("touchstart", (e)=>{
+  e.preventDefault();
+  fileInput.click();
+});
+
+fileInput.addEventListener("change", async (e)=>{
+  const files = Array.from(e.target.files);
+  for(const f of files){
+    const src = URL.createObjectURL(f);
+    photos.unshift(src);
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
+  render();
+  fileInput.value = "";
+});
+
+function render(){
+  grid.innerHTML = photos.map(p=>`
+    <div class="item"><img src="${p}"></div>
+  `).join("");
+}
+
+render();
+</script>
+</body>
+</html>
