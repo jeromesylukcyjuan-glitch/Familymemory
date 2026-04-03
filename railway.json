@@ -1,0 +1,11 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "echo 'No build needed'",
+    "publish": "/"
+  },
+  "deploy": {
+    "startCommand": "npx serve . -p $PORT"
+  }
+}
